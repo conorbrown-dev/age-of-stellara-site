@@ -1,0 +1,1 @@
+Place your licensed media here. Suggested paths: /assets/hero.jpg, /assets/gallery-01.jpg, /assets/gallery-02.jpg, /assets/gallery-03.jpg, /assets/album-cover.jpg, /assets/track-01.mp3. Set the paths in src/content.js. Until media is provided, the site displays designed placeholders and disables playback rather than pretending to stream music.
