@@ -8,16 +8,17 @@ export const band = {
   links: [] // e.g. {label:'YouTube',url:'https://...'}
 };
 // Shown in the hero and music section until tracks are added to `releases`.
-export const upcoming = { title: 'settling into the jaws of death and chaos', type: 'EP', status: 'Coming soon' };
+// Hero status line switches to the year once the EP is playable.
+export const upcoming = { title: 'settling into the jaws of death and chaos', type: 'EP', status: 'Coming soon', releasedStatus: '2026' };
 // Public address of the Cloudflare R2 bucket that holds the EP audio (no trailing slash).
 // Leave empty to keep showing "Coming soon"; once set, the tracklist and player go live.
 export const audioBase = 'https://pub-0b4b54e392e643b88a7034b1b6868121.r2.dev';
 const epTracks = [
-  'the wilderness between us',
-  '7 years',
-  'exile',
-  'dear v4.0.0',
-  'the pit',
+  ['the wilderness between us', '3:52'],
+  ['7 years', '2:55'],
+  ['exile', '4:06'],
+  ['dear v4.0.0', '3:52'],
+  ['the pit', '4:44'],
 ];
 export const releases = audioBase ? [{
   id: 'settling-into-the-jaws',
@@ -25,9 +26,9 @@ export const releases = audioBase ? [{
   type: 'EP',
   year: '2026',
   artwork: '/assets/album-cover.jpg',
-  tracks: epTracks.map((title, i) => {
+  tracks: epTracks.map(([title, duration], i) => {
     const n = String(i + 1).padStart(2, '0');
-    return { id: 'ep-' + n, title, duration: '', src: audioBase + '/' + encodeURIComponent(n + ' - ' + title + '.wav') };
+    return { id: 'ep-' + n, title, duration, src: audioBase + '/' + encodeURIComponent(n + ' - ' + title + '.wav') };
   }),
 }] : [];
 export const photos = [
