@@ -11,7 +11,7 @@ export const band = {
 };
 export const releases = [
   // Example:
-  // { id:'first-release', title:'Release Title', type:'Single', year:'2026', artwork:'/assets/album-cover.jpg',
+  // { id:'first-release', title:'Release Title', type:'EP', year:'2026', artwork:'/assets/album-cover.jpg',
   //   tracks:[{id:'song-1',title:'Song Title',duration:'5:12',src:'/assets/track-01.mp3'}] }
 ];
 export const photos = [
@@ -19,3 +19,5 @@ export const photos = [
   // {src:'/assets/gallery-02.jpg',alt:'Age of Stellara studio session'}
 ];
 export const heroImage = ''; // e.g. '/assets/hero.jpg'
+// Artwork for "Settling into the jaws of death and chaos".
+export const coverArt = '/assets/album-cover.jpg';
