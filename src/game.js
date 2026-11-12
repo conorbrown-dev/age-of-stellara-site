@@ -69,7 +69,7 @@ const PAL = {
 };
 
 // ---------- Game ----------
-export function mountGame(canvas, { onStart } = {}) {
+export function mountGame(canvas, { onStart, music } = {}) {
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -110,6 +110,23 @@ export function mountGame(canvas, { onStart } = {}) {
     die: () => tone('square', 400, 40, 0.9, 0.5),
   };
 
+  // Background music: a looped section of a track, loaded only once someone starts the game.
+  let bgm = null, bgmTimer = 0, bgmVol = 0.32;
+  const bgmPlay = () => {
+    if (!music?.src) return;
+    if (!bgm) {
+      bgm = new Audio(); bgm.preload = 'auto'; bgm.src = music.src; bgm.volume = bgmVol;
+      bgm.addEventListener('ended', () => { bgm.currentTime = 0; bgm.play().catch(() => {}); });
+    }
+    bgm.play().catch(() => {});
+    clearInterval(bgmTimer);
+    bgmTimer = setInterval(() => { if (bgm.currentTime >= music.loopEnd) bgm.currentTime = 0; }, 50);
+  };
+  const bgmStop = () => { bgm?.pause(); clearInterval(bgmTimer); };
+  const setPaused = (v) => { paused = v; if (v) bgmStop(); else bgmPlay(); };
+  const onPlayerPlay = () => { if (state === 'play' && !paused) setPaused(true); };
+  window.addEventListener('aos:player-play', onPlayerPlay);
+
   // Input
   const held = {}, pressed = {};
   const KEYS = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', KeyZ: 'jump', KeyK: 'jump', Enter: 'start' };
@@ -118,7 +135,7 @@ export function mountGame(canvas, { onStart } = {}) {
     const k = KEYS[e.code]; if (!k) return;
     e.preventDefault(); press(k, e.type === 'keydown');
   };
-  const onBlur = () => { for (const k in held) held[k] = false; if (state === 'play') paused = true; };
+  const onBlur = () => { for (const k in held) held[k] = false; if (state === 'play' && !paused) setPaused(true); };
   const onClick = () => { canvas.focus(); pressed.start = true; };
   canvas.addEventListener('keydown', onKey); canvas.addEventListener('keyup', onKey);
   canvas.addEventListener('blur', onBlur); canvas.addEventListener('pointerdown', onClick);
@@ -174,16 +191,16 @@ export function mountGame(canvas, { onStart } = {}) {
   function update() {
     tick++;
     if (state !== 'play') {
-      if (state === 'dead' && --timer <= 0) { lives--; if (lives < 0) { state = 'over'; } else { state = 'play'; spawnPlayer(); } }
+      if (state === 'dead' && --timer <= 0) { lives--; if (lives < 0) { state = 'over'; bgmStop(); } else { state = 'play'; spawnPlayer(); } }
       if (pressed.start || pressed.jump) {
         if (state === 'title' || state === 'over' || state === 'win') {
           if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.18; master.connect(ac.destination); }
-          ac.resume?.(); onStart?.(); newGame(); state = 'play';
+          ac.resume?.(); onStart?.(); newGame(); state = 'play'; paused = false; if (bgm) bgm.currentTime = 0; bgmPlay();
         }
       }
       clearPressed(); return;
     }
-    if (paused) { if (pressed.start || pressed.jump) paused = false; clearPressed(); return; }
+    if (paused) { if (pressed.start || pressed.jump) setPaused(false); clearPressed(); return; }
 
     // Player
     const acc = 0.2, max = 1.9;
@@ -262,7 +279,7 @@ export function mountGame(canvas, { onStart } = {}) {
         for (const o of orbs) if (!o.taken && overlap(o, p)) { o.taken = true; p.hp = Math.min(3, p.hp + 1); sfx.pickup(); }
     for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += 0.12; q.life--; }
     parts = parts.filter((q) => q.life > 0);
-    if (L.gate.open && overlap(p, L.gate)) { state = 'win'; sfx.gate(); }
+    if (L.gate.open && overlap(p, L.gate)) { state = 'win'; bgmStop(); sfx.gate(); }
     depth = Math.max(depth, Math.floor(p.x / T));
     camX = Math.max(0, Math.min(p.x - 112, L.LW * T - W));
     clearPressed();
@@ -429,19 +446,20 @@ export function mountGame(canvas, { onStart } = {}) {
   };
   const startLoop = () => { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } };
   const stopLoop = () => { cancelAnimationFrame(raf); raf = 0; };
-  const io = new IntersectionObserver(([en]) => { visible = en.isIntersecting; if (visible) startLoop(); else { stopLoop(); if (state === 'play') paused = true; } });
+  const io = new IntersectionObserver(([en]) => { visible = en.isIntersecting; if (visible) startLoop(); else { stopLoop(); if (state === 'play' && !paused) setPaused(true); } });
   io.observe(canvas);
   newGame(); state = 'title'; camX = 0; draw(); startLoop();
 
   return {
     press,
+    setMusicVolume(v) { bgmVol = v; if (bgm) bgm.volume = v; },
     destroy() {
-      stopLoop(); io.disconnect();
+      stopLoop(); io.disconnect(); bgmStop(); bgm = null; window.removeEventListener('aos:player-play', onPlayerPlay);
       canvas.removeEventListener('keydown', onKey); canvas.removeEventListener('keyup', onKey);
       canvas.removeEventListener('blur', onBlur); canvas.removeEventListener('pointerdown', onClick);
       ac?.close?.();
     },
     // For automated checks only.
-    _debug: () => ({ state, paused, lives, depth, hp: p.hp, x: p.x, y: p.y, cp, enemies: enemies.length, gateOpen: L.gate.open }),
+    _debug: () => ({ state, paused, music: bgm ? { playing: !bgm.paused, t: +bgm.currentTime.toFixed(2) } : null, lives, depth, hp: p.hp, x: p.x, y: p.y, cp, enemies: enemies.length, gateOpen: L.gate.open }),
   };
 }
