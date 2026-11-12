@@ -26,7 +26,7 @@ let done=false,timer=0;const starters=['pointerdown','keydown'];
 const stopStarters=()=>starters.forEach(ev=>window.removeEventListener(ev,onFirst,true));
 const cancel=()=>{if(done)return;done=true;a.pause();clearInterval(timer);stopStarters();a.dataset.state='cancelled'};
 const start=()=>{if(done)return Promise.resolve();return a.play().then(()=>{a.dataset.state='looping';stopStarters();clearInterval(timer);timer=setInterval(()=>{if(a.currentTime>=LOOP_END)a.currentTime=0},50)})};
-function onFirst(e){if(e.target.closest&&e.target.closest('.player,.track'))return;start().catch(()=>{})}
+function onFirst(e){if(e.target.closest&&e.target.closest('.player,.track,.game-section'))return;start().catch(()=>{})}
 const onOtherPlay=e=>{if(e.target!==a)cancel()};
 document.addEventListener('play',onOtherPlay,true);window.addEventListener('aos:media',cancel);
 a.addEventListener('ended',()=>{if(!done){a.currentTime=0;a.play().catch(()=>{})}});
