@@ -2,10 +2,10 @@
 // Audio must be publicly available HTTPS or a file hosted under public/assets.
 export const band = {
   name: 'AGE OF STELLARA',
-  tagline: 'BEYOND THE SILENCE',
+  tagline: 'A WILLING DESCENT',
   eyebrow: 'PROGRESSIVE METAL · FAITH / FRACTURE / REDEMPTION',
-  description: 'Age of Stellara is a progressive metal project built around the tension between faith and separation, conviction and doubt, the weight of struggle and the possibility of redemption. Intricate rhythms, crushing guitars, cinematic textures, and dynamic songwriting tell stories shaped by a deeply personal walk with God.',
-  statement: 'An exploration of what happens in the distance—and what remains when the light breaks through.',
+  description: 'Age of Stellara is a progressive metal project built on a personal story of faith: turning away from God, choosing the pit of chaos and death, and the grace that reaches into it. Intricate rhythms, crushing guitars, and cinematic textures carry songs written from a deeply personal walk with God.',
+  statement: 'I turned from God, and I climbed into the pit of my own free will.',
   contact: '', // e.g. booking@example.com
   links: [] // e.g. {label:'YouTube',url:'https://...'}
 };
