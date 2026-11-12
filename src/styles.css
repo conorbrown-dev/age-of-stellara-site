@@ -52,7 +52,7 @@ h1, h2, h3, p { margin-top: 0; }
 .mobile-menu { display: none; }
 
 /* ---------- Hero ---------- */
-.hero { min-height: min(820px, 92vh); position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); align-items: center; gap: clamp(24px, 4vw, 70px); padding: 95px clamp(22px, 7vw, 130px); isolation: isolate;
+.hero { min-height: min(820px, 92vh); position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: clamp(24px, 4vw, 70px); padding: 95px clamp(22px, 7vw, 130px); isolation: isolate;
   background-color: var(--bg);
   background-image:
     radial-gradient(ellipse at 76% 36%, rgba(255, 174, 69, .22) 0%, rgba(255, 120, 40, .08) 32%, transparent 58%),
