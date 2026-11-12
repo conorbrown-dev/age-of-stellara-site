@@ -1,7 +1,8 @@
 // Into the Jaws — a small NES-style platformer for the Age of Stellara site.
 // Drawn at the NES resolution (256x240) and scaled up with crisp pixels.
-// Mechanics: run, variable-height jump, fire, 3 hits per life, 3 lives, checkpoints,
-// imps that throw fire, flaming skulls that charge, and a large demon guarding the gate.
+// Mechanics: run and variable-height jump only — the wanderer cannot fight, only evade.
+// 3 hits per life, 3 lives, checkpoints; imps that throw fire, flaming skulls that charge,
+// and a large demon pacing in front of the gate.
 
 const T = 16, W = 256, H = 240, ROWS = 15, STEP = 1000 / 60;
 
@@ -37,7 +38,7 @@ function buildLevel() {
   sp('imp', 127, 11); sp('imp', 146, 11); sp('orb', 143, 11); sp('soul', 135, 6);
   rect(153, 153, 10, 10, '#');
   ground(156, LW - 1); rect(LW - 1, LW - 1, 0, 11, '#'); sp('baron', 182, 11);
-  return { g, LW, spawns, gate: { x: 194 * T, y: 9 * T, w: 2 * T, h: 3 * T, open: false }, checkpoints: [2, 67, 124, 157] };
+  return { g, LW, spawns, gate: { x: 194 * T, y: 9 * T, w: 2 * T, h: 3 * T, open: true }, checkpoints: [2, 67, 124, 157] };
 }
 
 // ---------- Sprites ----------
@@ -111,7 +112,7 @@ export function mountGame(canvas, { onStart } = {}) {
 
   // Input
   const held = {}, pressed = {};
-  const KEYS = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', KeyZ: 'jump', KeyK: 'jump', KeyX: 'fire', KeyJ: 'fire', Enter: 'start' };
+  const KEYS = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', KeyZ: 'jump', KeyK: 'jump', Enter: 'start' };
   const press = (k, v) => { if (v && !held[k]) pressed[k] = true; held[k] = v; };
   const onKey = (e) => {
     const k = KEYS[e.code]; if (!k) return;
@@ -123,7 +124,7 @@ export function mountGame(canvas, { onStart } = {}) {
   canvas.addEventListener('blur', onBlur); canvas.addEventListener('pointerdown', onClick);
 
   // World state
-  let L, p, enemies, shots, parts, orbs, camX, state = 'title', paused = false, lives, score, timer = 0, cp, tick = 0;
+  let L, p, enemies, shots, parts, orbs, camX, state = 'title', paused = false, lives, depth, timer = 0, cp, tick = 0;
 
   const tileAt = (tx, ty) => (tx < 0 || tx >= L.LW) ? '#' : (ty < 0 || ty >= ROWS) ? '.' : L.g[ty][tx];
   const solid = (c) => c === '#' || c === '=';
@@ -144,7 +145,7 @@ export function mountGame(canvas, { onStart } = {}) {
   const groundY = (tx) => { for (let ty = 0; ty < ROWS; ty++) if (solid(tileAt(tx, ty))) return ty * T; return 12 * T; };
 
   function newGame() {
-    L = buildLevel(); lives = 3; score = 0; cp = 0;
+    L = buildLevel(); lives = 3; depth = 0; cp = 0;
     enemies = []; orbs = [];
     for (const s of L.spawns) {
       const x = s.tx * T, bottom = (s.row + 1) * T;
@@ -161,7 +162,7 @@ export function mountGame(canvas, { onStart } = {}) {
     shots = []; parts = [];
   }
   const burst = (x, y, n, colors) => { for (let i = 0; i < n; i++) parts.push({ x, y, vx: rnd(-1.6, 1.6), vy: rnd(-2.4, 0.4), life: rnd(18, 36), c: colors[i % colors.length] }); };
-  const fire = (x, y, vx, vy) => shots.push({ x: x - 3, y: y - 3, w: 6, h: 6, vx, vy, mine: false, life: 200 });
+  const fire = (x, y, vx, vy) => shots.push({ x: x - 3, y: y - 3, w: 6, h: 6, vx, vy, life: 200 });
 
   function hurt() {
     if (p.inv > 0) return;
@@ -182,7 +183,7 @@ export function mountGame(canvas, { onStart } = {}) {
       }
       clearPressed(); return;
     }
-    if (paused) { if (pressed.start || pressed.jump || pressed.fire) paused = false; clearPressed(); return; }
+    if (paused) { if (pressed.start || pressed.jump) paused = false; clearPressed(); return; }
 
     // Player
     const acc = 0.2, max = 1.9;
@@ -199,11 +200,6 @@ export function mountGame(canvas, { onStart } = {}) {
     if (p.x < T) p.x = T;
     p.run = p.onGround && p.vx !== 0 ? p.run + 1 : 0;
     if (p.inv > 0) p.inv--;
-    if (p.cool > 0) p.cool--;
-    if (pressed.fire && p.cool <= 0 && shots.filter((s) => s.mine).length < 3) {
-      shots.push({ x: p.x + (p.face > 0 ? 9 : -5), y: p.y + 7, w: 6, h: 3, vx: 4.2 * p.face, vy: 0, mine: true, life: 55 });
-      p.cool = 12; sfx.shoot();
-    }
     if (p.y > H + 24) { die(); clearPressed(); return; }
     // Spikes
     const sx0 = Math.floor((p.x + 2) / T), sx1 = Math.floor((p.x + p.w - 2) / T), sy = Math.floor((p.y + p.h - 3) / T);
@@ -260,24 +256,14 @@ export function mountGame(canvas, { onStart } = {}) {
     for (const s of shots) {
       s.x += s.vx; s.y += s.vy; s.life--;
       if (solid(tileAt(Math.floor((s.x + s.w / 2) / T), Math.floor((s.y + s.h / 2) / T)))) { s.life = 0; burst(s.x, s.y, 3, [C.amber, C.k]); }
-      if (s.mine) {
-        for (const e of enemies) if (e.hp > 0 && s.life > 0 && overlap(s, e)) {
-          s.life = 0; e.hp--; e.flash = 6; sfx.hit();
-          if (e.type === 'baron') e.active = true;
-          if (e.hp <= 0) {
-            sfx.kill(); burst(e.x + e.w / 2, e.y + e.h / 2, e.type === 'baron' ? 40 : 12, [C.k, C.red, C.amber, C.mid]);
-            score += { imp: 100, soul: 50, baron: 1000 }[e.type];
-            if (e.type === 'baron') { L.gate.open = true; sfx.gate(); }
-          }
-        }
-      } else if (s.life > 0 && overlap(s, p)) { s.life = 0; hurt(); }
+      if (s.life > 0 && overlap(s, p)) { s.life = 0; hurt(); }
     }
     shots = shots.filter((s) => s.life > 0 && s.x > camX - 40 && s.x < camX + W + 40);
-    enemies = enemies.filter((e) => e.hp > 0);
-    for (const o of orbs) if (!o.taken && overlap(o, p)) { o.taken = true; p.hp = Math.min(3, p.hp + 1); score += 25; sfx.pickup(); }
+        for (const o of orbs) if (!o.taken && overlap(o, p)) { o.taken = true; p.hp = Math.min(3, p.hp + 1); sfx.pickup(); }
     for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += 0.12; q.life--; }
     parts = parts.filter((q) => q.life > 0);
     if (L.gate.open && overlap(p, L.gate)) { state = 'win'; sfx.gate(); }
+    depth = Math.max(depth, Math.floor(p.x / T));
     camX = Math.max(0, Math.min(p.x - 112, L.LW * T - W));
     clearPressed();
   }
@@ -386,8 +372,7 @@ export function mountGame(canvas, { onStart } = {}) {
     }
     if (state !== 'dead' && !(p.inv > 0 && (tick >> 2) % 2)) drawSprite(p.run % 16 < 8 ? SPR.player : SPR.playerRun, p.x - cx, p.y, p.face < 0, PAL.player);
     for (const s of shots) {
-      if (s.mine) { ctx.fillStyle = C.amber; ctx.fillRect(s.x - cx, s.y, s.w, s.h); ctx.fillStyle = C.bone; ctx.fillRect(s.x - cx + (s.vx > 0 ? 4 : 0), s.y, 2, s.h); }
-      else { ctx.fillStyle = tick % 4 < 2 ? C.red : C.deep; ctx.fillRect(s.x - cx, s.y, s.w, s.h); ctx.fillStyle = C.amber; ctx.fillRect(s.x - cx + 2, s.y + 2, 2, 2); }
+      ctx.fillStyle = tick % 4 < 2 ? C.red : C.deep; ctx.fillRect(s.x - cx, s.y, s.w, s.h); ctx.fillStyle = C.amber; ctx.fillRect(s.x - cx + 2, s.y + 2, 2, 2);
     }
     for (const q of parts) { ctx.fillStyle = q.c; ctx.fillRect(q.x - cx, q.y, 2, 2); }
   }
@@ -398,7 +383,7 @@ export function mountGame(canvas, { onStart } = {}) {
   function drawHud() {
     for (let i = 0; i < 3; i++) star(14 + i * 12, 14, 5, C.red, true, i >= p.hp);
     text('x' + Math.max(lives, 0), 50, 14, 10, C.bone, 'left');
-    text(String(score).padStart(6, '0'), W - 10, 14, 10, C.amber, 'right');
+    text('depth ' + depth, W - 10, 14, 10, C.amber, 'right');
   }
   function draw() {
     if (state === 'title') {
@@ -406,13 +391,13 @@ export function mountGame(canvas, { onStart } = {}) {
       text('into the jaws', W / 2, 92, 26, C.red);
       text('age of stellara', W / 2, 116, 10, C.bone);
       if ((tick >> 5) % 2 === 0) text('press start', W / 2, 160, 12, C.amber);
-      text('arrows move · z jump · x fire', W / 2, 212, 8, C.mid);
+      text('arrows move · z jump', W / 2, 212, 8, C.mid);
       return;
     }
     drawWorld(); ctx.drawImage(frame, 0, 0); drawHud();
     if (paused) { ctx.fillStyle = 'rgba(5,3,4,.6)'; ctx.fillRect(0, 0, W, H); text('paused', W / 2, 110, 18, C.amber); text('click to resume', W / 2, 132, 9, C.bone); }
     if (state === 'over') { ctx.fillStyle = 'rgba(5,3,4,.75)'; ctx.fillRect(0, 0, W, H); text('swallowed', W / 2, 104, 24, C.red); text('press start', W / 2, 140, 11, C.amber); }
-    if (state === 'win') { ctx.fillStyle = 'rgba(5,3,4,.7)'; ctx.fillRect(0, 0, W, H); text('deeper still', W / 2, 100, 24, C.amber); text('score ' + score, W / 2, 128, 11, C.bone); text('press start', W / 2, 154, 10, C.red); }
+    if (state === 'win') { ctx.fillStyle = 'rgba(5,3,4,.7)'; ctx.fillRect(0, 0, W, H); text('deeper still', W / 2, 100, 24, C.amber); text('depth ' + depth, W / 2, 128, 11, C.bone); text('press start', W / 2, 154, 10, C.red); }
   }
   function makeFrame() {
     const f = document.createElement('canvas'); f.width = W; f.height = H;
@@ -457,6 +442,6 @@ export function mountGame(canvas, { onStart } = {}) {
       ac?.close?.();
     },
     // For automated checks only.
-    _debug: () => ({ state, paused, lives, score, hp: p.hp, x: p.x, y: p.y, cp, enemies: enemies.length, gateOpen: L.gate.open }),
+    _debug: () => ({ state, paused, lives, depth, hp: p.hp, x: p.x, y: p.y, cp, enemies: enemies.length, gateOpen: L.gate.open }),
   };
 }

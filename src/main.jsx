@@ -12,9 +12,9 @@ const fmt=n=>Number.isFinite(n)?Math.floor(n/60)+':'+String(Math.floor(n%60)).pa
 function Game(){const ref=useRef(null),api=useRef(null);
 useEffect(()=>{api.current=mountGame(ref.current,{onStart:()=>window.dispatchEvent(new Event('aos:media'))});return()=>api.current.destroy()},[]);
 const hold=k=>({onPointerDown:e=>{e.preventDefault();api.current?.press(k,true)},onPointerUp:()=>api.current?.press(k,false),onPointerLeave:()=>api.current?.press(k,false),onPointerCancel:()=>api.current?.press(k,false)});
-return <section className="section game-section" id="play"><div className="section-head"><div><p className="section-kicker"><Star slot="play"/> PLAY</p><h2>INTO THE JAWS</h2></div><p className="section-desc">Click the screen to start. Arrow keys to move, Z to jump, X to fire.</p></div>
+return <section className="section game-section" id="play"><div className="section-head"><div><p className="section-kicker"><Star slot="play"/> PLAY</p><h2>INTO THE JAWS</h2></div><p className="section-desc">Click the screen to start. Arrow keys to move, Z to jump.</p></div>
 <div className="game-frame"><canvas ref={ref} width="256" height="240" tabIndex="0" aria-label="Into the Jaws, a platformer game. Click to start."/></div>
-<div className="game-touch" aria-hidden="true"><div><button {...hold('left')}>◀</button><button {...hold('right')}>▶</button></div><div><button {...hold('fire')}>FIRE</button><button {...hold('jump')}>JUMP</button></div></div></section>}
+<div className="game-touch" aria-hidden="true"><div><button {...hold('left')}>◀</button><button {...hold('right')}>▶</button></div><div><button {...hold('jump')}>JUMP</button></div></div></section>}
 function App(){
 const audio=useRef(null),ambient=useRef(null),trackRef=useRef(null),[active,setActive]=useState(null),[playing,setPlaying]=useState(false),[elapsed,setElapsed]=useState(0),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[muted,setMuted]=useState(false),[shuffle,setShuffle]=useState(false),[repeat,setRepeat]=useState(0),[menu,setMenu]=useState(false),[galleryImage,setGalleryImage]=useState(null),[error,setError]=useState('');
 const current=allTracks.find(t=>t.id===active)||null, hasTracks=allTracks.length>0;
