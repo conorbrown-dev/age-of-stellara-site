@@ -9,11 +9,27 @@ export const band = {
 };
 // Shown in the hero and music section until tracks are added to `releases`.
 export const upcoming = { title: 'settling into the jaws of death and chaos', type: 'EP', status: 'Coming soon' };
-export const releases = [
-  // Example:
-  // { id:'first-release', title:'Release Title', type:'EP', year:'2026', artwork:'/assets/album-cover.jpg',
-  //   tracks:[{id:'song-1',title:'Song Title',duration:'5:12',src:'/assets/track-01.mp3'}] }
+// Public address of the Cloudflare R2 bucket that holds the EP audio (no trailing slash).
+// Leave empty to keep showing "Coming soon"; once set, the tracklist and player go live.
+export const audioBase = '';
+const epTracks = [
+  'the wilderness between us',
+  '7 years',
+  'exile',
+  'dear v4.0.0',
+  'the pit',
 ];
+export const releases = audioBase ? [{
+  id: 'settling-into-the-jaws',
+  title: 'settling into the jaws of death and chaos',
+  type: 'EP',
+  year: '2026',
+  artwork: '/assets/album-cover.jpg',
+  tracks: epTracks.map((title, i) => {
+    const n = String(i + 1).padStart(2, '0');
+    return { id: 'ep-' + n, title, duration: '', src: audioBase + '/' + encodeURIComponent(n + ' - ' + title + '.wav') };
+  }),
+}] : [];
 export const photos = [
   // {src:'/assets/gallery-01.jpg',alt:'Age of Stellara live performance'},
   // {src:'/assets/gallery-02.jpg',alt:'Age of Stellara studio session'}
