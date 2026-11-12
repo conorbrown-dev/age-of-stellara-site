@@ -162,6 +162,17 @@ footer { padding: 35px clamp(22px, 5vw, 90px) 140px; border-top: 1px solid var(-
 footer > span { color: #8e7f72; font: 400 11px/1.4 var(--display); letter-spacing: .12em; }
 .footer-mark { font-size: 22px; }
 
+/* ---------- Game ---------- */
+.game-section { border-top: 1px solid var(--line); }
+.game-frame { max-width: 768px; margin: 0 auto; border: 1px solid #3a2118; box-shadow: 0 0 80px rgba(255, 90, 40, .12); background: #000; }
+.game-frame canvas { display: block; width: 100%; height: auto; aspect-ratio: 256 / 240; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; outline: none; }
+.game-frame canvas:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.game-touch { display: none; max-width: 768px; margin: 14px auto 0; justify-content: space-between; gap: 12px; user-select: none; -webkit-user-select: none; touch-action: none; }
+.game-touch div { display: flex; gap: 10px; }
+.game-touch button { width: 64px; height: 56px; border: 1px solid #5a3226; background: #120807; color: var(--amber); font: 400 13px/1 var(--display); letter-spacing: .1em; touch-action: none; }
+.game-touch button:active { background: var(--red); color: #120805; }
+@media (pointer: coarse) { .game-touch { display: flex; } }
+
 /* ---------- Player ---------- */
 .player { position: fixed; z-index: 40; bottom: 0; left: 0; right: 0; height: 99px; background: #0c0605; border-top: 1px solid #4a1f1c; display: grid; grid-template-columns: 1fr minmax(310px, 1.15fr) 1fr; align-items: center; gap: 30px; padding: 12px clamp(18px, 3vw, 60px); box-shadow: 0 -12px 30px #000a; }
 .player-track { display: flex; align-items: center; gap: 14px; min-width: 0; }
