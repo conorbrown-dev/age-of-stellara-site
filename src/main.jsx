@@ -5,12 +5,28 @@ const allTracks=releases.flatMap(r=>r.tracks.map(t=>({...t,releaseId:r.id,releas
 const STAR_SLOTS=['header','eyebrow','music','about','follow'];
 const HOLLOW=new Set([...STAR_SLOTS].sort(()=>Math.random()-.5).slice(0,2));
 function Star({slot,hollow}){if(hollow||HOLLOW.has(slot))return <span className="star star-hollow" aria-hidden="true">✧</span>;return <svg className="star star-inverted" viewBox="0 0 24 24" aria-hidden="true"><polygon transform="rotate(180 12 12)" points="12,2 14.9,8.9 22.5,9.3 16.6,14.2 18.6,21.5 12,17.4 5.4,21.5 7.4,14.2 1.5,9.3 9.1,8.9" fill="currentColor"/></svg>}
+// Opening loop: on page load, "exile" loops from 0:00 to 1:03 until any other audio on the site plays.
+// LOOP_VOLUME is a fraction of the player volume: kept very low so visitors have to listen for it.
+const LOOP_TRACK='exile', LOOP_END=63, LOOP_VOLUME=.1;
 const fmt=n=>Number.isFinite(n)?Math.floor(n/60)+':'+String(Math.floor(n%60)).padStart(2,'0'):'0:00';
 function App(){
-const audio=useRef(null),trackRef=useRef(null),[active,setActive]=useState(null),[playing,setPlaying]=useState(false),[elapsed,setElapsed]=useState(0),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[muted,setMuted]=useState(false),[shuffle,setShuffle]=useState(false),[repeat,setRepeat]=useState(0),[menu,setMenu]=useState(false),[galleryImage,setGalleryImage]=useState(null),[error,setError]=useState('');
+const audio=useRef(null),ambient=useRef(null),trackRef=useRef(null),[active,setActive]=useState(null),[playing,setPlaying]=useState(false),[elapsed,setElapsed]=useState(0),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[muted,setMuted]=useState(false),[shuffle,setShuffle]=useState(false),[repeat,setRepeat]=useState(0),[menu,setMenu]=useState(false),[galleryImage,setGalleryImage]=useState(null),[error,setError]=useState('');
 const current=allTracks.find(t=>t.id===active)||null, hasTracks=allTracks.length>0;
 trackRef.current=current;
-useEffect(()=>{if(audio.current)audio.current.volume=muted?0:volume},[volume,muted]);
+useEffect(()=>{const v=muted?0:volume;if(audio.current)audio.current.volume=v;if(ambient.current)ambient.current.volume=v*LOOP_VOLUME},[volume,muted]);
+useEffect(()=>{const t=allTracks.find(x=>x.title===LOOP_TRACK);if(!t?.src)return;
+const a=document.createElement('audio');a.className='ambient-loop';a.preload='auto';a.src=t.src;a.hidden=true;a.volume=.8*LOOP_VOLUME;document.body.appendChild(a);ambient.current=a;
+let done=false,timer=0;const starters=['pointerdown','keydown'];
+const stopStarters=()=>starters.forEach(ev=>window.removeEventListener(ev,onFirst,true));
+const cancel=()=>{if(done)return;done=true;a.pause();clearInterval(timer);stopStarters();a.dataset.state='cancelled'};
+const start=()=>{if(done)return Promise.resolve();return a.play().then(()=>{a.dataset.state='looping';stopStarters();clearInterval(timer);timer=setInterval(()=>{if(a.currentTime>=LOOP_END)a.currentTime=0},50)})};
+function onFirst(e){if(e.target.closest&&e.target.closest('.player,.track'))return;start().catch(()=>{})}
+const onOtherPlay=e=>{if(e.target!==a)cancel()};
+document.addEventListener('play',onOtherPlay,true);
+a.addEventListener('ended',()=>{if(!done){a.currentTime=0;a.play().catch(()=>{})}});
+a.dataset.state='waiting';
+start().catch(()=>{starters.forEach(ev=>window.addEventListener(ev,onFirst,true))});
+return()=>{cancel();document.removeEventListener('play',onOtherPlay,true);a.remove()};},[]);
 useEffect(()=>{const el=audio.current;if(!el)return;el.pause();setElapsed(0);setDuration(0);setError('');if(!current?.src){setPlaying(false);return;}el.src=current.src;el.load();el.play().then(()=>setPlaying(true)).catch(()=>{setPlaying(false);setError('Playback could not start. Check the audio file or press Play.')});},[active]);
 const playTrack=(id)=>{if(id===active){toggle();return;}setActive(id)};
 const toggle=()=>{if(!hasTracks)return;if(!current){setActive(allTracks[0].id);return;}if(!current.src){setError('Audio is not available for this track yet.');return;}if(audio.current.paused){audio.current.play().then(()=>{setPlaying(true);setError('')}).catch(()=>setError('This audio file cannot be played.'));}else{audio.current.pause();setPlaying(false)}};
