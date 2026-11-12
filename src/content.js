@@ -11,7 +11,7 @@ export const band = {
 export const upcoming = { title: 'settling into the jaws of death and chaos', type: 'EP', status: 'Coming soon' };
 // Public address of the Cloudflare R2 bucket that holds the EP audio (no trailing slash).
 // Leave empty to keep showing "Coming soon"; once set, the tracklist and player go live.
-export const audioBase = '';
+export const audioBase = 'https://pub-0b4b54e392e643b88a7034b1b6868121.r2.dev';
 const epTracks = [
   'the wilderness between us',
   '7 years',
