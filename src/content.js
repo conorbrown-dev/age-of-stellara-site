@@ -5,7 +5,10 @@ export const band = {
   eyebrow: 'PROGRESSIVE METAL',
   description: 'Age of Stellara is a progressive metal project. The debut EP, settling into the jaws of death and chaos, is the first part of a story that concludes on a full-length album.',
   contact: '', // e.g. booking@example.com
-  links: [] // e.g. {label:'YouTube',url:'https://...'}
+  links: [
+    { label: 'YOUTUBE', url: 'https://www.youtube.com/channel/UCCOxqDbQgHd0Q3YTwJ-BMyg' },
+    { label: 'FACEBOOK', url: 'https://www.facebook.com/profile.php?id=61596274840497' },
+  ]
 };
 // Shown in the hero and music section until tracks are added to `releases`.
 // Hero status line switches to the year once the EP is playable.
