@@ -104,6 +104,67 @@ No reprieve
 No relief
 No rescue`,
 
+  'ep-04': `Dear Dad,
+I had a dream about you last night.
+You were everything I wish you could’ve been.
+A present father, a loving husband to my mother.
+A caring and kind grandfather to my children.
+We spoke about our regrets about the past, and our many failures as men.
+It seemed as though you had finally woken up.
+And a new life could begin.
+
+But dreams are just dreams
+The illusion fades by morning
+
+I’ve spent most of this life trying to remove the parts of you that have caused all of us so much pain.
+I’ve seen so many things that a kid should never have had to see.
+A mother screaming in terror as her son was taken away from her
+I sat in a classroom of strangers, in a state I’d never been to
+I hugged your daughter through the screams and fighting
+and told her that everything would be alright
+
+But dreams aren’t just dreams
+they’re lies we tell ourselves
+to stop hurting
+
+A life spent undoing
+The hell in my head
+That you planted
+The hell in our home
+
+No daughter should have to
+Step up
+To a coward
+Hitting her mother
+No son of twelve
+Should have to
+Step into a man’s shoes
+To defend his family from his own father
+
+SINS OF THE FATHER
+POISON IN YOUR VEINS
+WATCHING THE BLOOD
+RUN DOWN THE FAMILY TREE
+DISHONOR AND CHAOS
+THE SEEDS YOU SOW
+THE HELL YOU CREATED
+AND GREW IN OUR HOME
+
+I GAVE IT SOME THOUGHT
+AND I THINK YOU WERE RIGHT
+I DON’T DESERVE TO
+CARRY DISHONOR AND SHAME
+SINS OF THE FATHER
+STOP WITH ME
+
+But I forgive you
+Not out of spite
+And not to prove anything
+But because you’re my father
+and I love you
+and my love for you will remain
+‘til the end of the line`,
+
   'ep-05': `OH
 THE CULMINATION
 OF ALL I’VE FEARED
