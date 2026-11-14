@@ -156,6 +156,7 @@ h1, h2, h3, p { margin-top: 0; }
 .connect-section > p:not(.section-kicker) { font-size: 20px; color: #c3b4a4; }
 .social-links { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 35px; }
 .social-links a, .social-links span { font: 400 13px/1 var(--display); letter-spacing: .14em; text-transform: lowercase; border: 1px solid #5a3226; padding: 16px 24px; display: flex; align-items: center; gap: 15px; }
+.social-links a .brand-icon { flex: none; margin-right: -3px; }
 .social-links a:hover { border-color: var(--red); color: var(--red); }
 .social-links span { color: #92826f; }
 
