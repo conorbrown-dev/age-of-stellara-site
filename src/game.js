@@ -141,16 +141,22 @@ export function mountGame(canvas, { onStart, music } = {}) {
   };
 
   // Background music: a looped section of a track, loaded only once someone starts the game.
-  let bgm = null, bgmTimer = 0, bgmVol = 0.32;
-  const bgmPlay = () => {
-    if (!music?.src) return;
+  // `music` is one {src, start, end} or a list with one entry per level; each loops between start and end (seconds).
+  const tracks = (Array.isArray(music) ? music : [music]).filter((m) => m?.src);
+  let bgm = null, bgmIdx = -1, bgmTimer = 0, bgmVol = 0.32;
+  const bgmPlay = (restart = false) => {
+    const m = tracks[Math.min(levelIdx, tracks.length - 1)]; if (!m) return;
+    const a0 = m.start || 0;
+    if (bgm && bgmIdx !== levelIdx && tracks.length > 1) { bgm.pause(); bgm = null; }
     if (!bgm) {
-      bgm = new Audio(); bgm.preload = 'auto'; bgm.src = music.src; bgm.volume = bgmVol;
-      bgm.addEventListener('ended', () => { bgm.currentTime = 0; bgm.play().catch(() => {}); });
-    }
-    bgm.play().catch(() => {});
+      bgmIdx = levelIdx; const a = new Audio(); bgm = a; a.preload = 'auto'; a.src = m.src; a.volume = bgmVol;
+      a.addEventListener('ended', () => { a.currentTime = a0; a.play().catch(() => {}); });
+      a.currentTime = a0;
+    } else if (restart) bgm.currentTime = a0;
+    const a = bgm;
+    a.play().catch(() => {});
     clearInterval(bgmTimer);
-    bgmTimer = setInterval(() => { if (bgm.currentTime >= music.loopEnd) bgm.currentTime = 0; }, 50);
+    bgmTimer = setInterval(() => { if (a.currentTime >= m.end || a.currentTime < a0 - 0.5) a.currentTime = a0; }, 50);
   };
   const bgmStop = () => { bgm?.pause(); clearInterval(bgmTimer); };
   const setPaused = (v) => { paused = v; if (v) bgmStop(); else bgmPlay(); };
@@ -197,7 +203,7 @@ export function mountGame(canvas, { onStart, music } = {}) {
       if (res?.ok && res.json?.scores) { board = res.json.scores; myRank = res.json.rank || 0; } else refreshBoard();
     });
   }
-  function beginGame() { newGame(); state = 'play'; paused = false; if (bgm) bgm.currentTime = 0; bgmPlay(); }
+  function beginGame() { newGame(); state = 'play'; paused = false; bgmPlay(true); }
   // Ask the server for a run (it checks the initials), then start. If the server can't be reached, play anyway without a score.
   function beginRun() {
     busy = true; nameMsg = '';
@@ -296,7 +302,7 @@ export function mountGame(canvas, { onStart, music } = {}) {
     if (lock > 0) lock--;
     if (state !== 'play') {
       const go = pressed.start || pressed.jump || pressed.tap;
-      if (state === 'next') { if (--timer <= 0 || (timer < 90 && go)) { loadLevel(levelIdx + 1); state = 'play'; } }
+      if (state === 'next') { if (--timer <= 0 || (timer < 90 && go)) { loadLevel(levelIdx + 1); state = 'play'; bgmPlay(true); } }
       else if (state === 'dead') { if (--timer <= 0) { lives--; if (lives < 0) { state = 'over'; bgmStop(); endRun(); } else { state = 'play'; spawnPlayer(); } } }
       else if (state === 'title') { if (go) { if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.18; master.connect(ac.destination); } ac.resume?.(); openName(); } }
       else if (state === 'name') nameUpdate();
