@@ -1,6 +1,9 @@
 // Into the Jaws — a small NES-style platformer for the Age of Stellara site.
 // Drawn at the NES resolution (256x240) and scaled up with crisp pixels.
 // Mechanics: run and variable-height jump only — the wanderer cannot fight, only evade.
+// Score: slip past an imp or skull without being touched (+100), dodge a fireball (+50) or a skull's
+// charge (+100), and get past the demon at the gate (+1000). Three-letter initials are chosen before a
+// run and the top scores are kept on the site's server.
 // 3 hits per life, 3 lives, checkpoints; imps that throw fire, flaming skulls that charge,
 // and a large demon pacing in front of the gate.
 
@@ -108,6 +111,8 @@ export function mountGame(canvas, { onStart, music } = {}) {
     roar: () => { tone('sawtooth', 90, 40, 0.9, 0.7); noise(0.9, 0.5, 200); },
     gate: () => tone('triangle', 70, 220, 1.2, 0.6),
     die: () => tone('square', 400, 40, 0.9, 0.5),
+    score: () => tone('square', 700, 1100, 0.07, 0.25),
+    tick: () => tone('square', 520, 520, 0.03, 0.2),
   };
 
   // Background music: a looped section of a track, loaded only once someone starts the game.
@@ -132,16 +137,85 @@ export function mountGame(canvas, { onStart, music } = {}) {
   const KEYS = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', KeyZ: 'jump', KeyK: 'jump', Enter: 'start' };
   const press = (k, v) => { if (v && !held[k]) pressed[k] = true; held[k] = v; };
   const onKey = (e) => {
+    if (state === 'name' && e.type === 'keydown' && nameKey(e)) { e.preventDefault(); return; }
     const k = KEYS[e.code]; if (!k) return;
     e.preventDefault(); press(k, e.type === 'keydown');
   };
   const onBlur = () => { for (const k in held) held[k] = false; if (state === 'play' && !paused) setPaused(true); };
-  const onClick = () => { canvas.focus(); pressed.start = true; };
+  const onClick = () => { canvas.focus(); pressed.tap = true; };
   canvas.addEventListener('keydown', onKey); canvas.addEventListener('keyup', onKey);
   canvas.addEventListener('blur', onBlur); canvas.addEventListener('pointerdown', onClick);
 
   // World state
   let L, p, enemies, shots, parts, orbs, camX, state = 'title', paused = false, lives, depth, timer = 0, cp, tick = 0;
+  let score = 0, popups = [], board = null, run = null, slot = 0, busy = false, nameMsg = '', lock = 0, myRank = 0, destroyed = false;
+  const CH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', rep = { left: 0, right: 0 };
+  let initials = ['A', 'A', 'A'];
+  try { const v = (localStorage.getItem('aos-initials') || '').toUpperCase(); if (/^[A-Z0-9]{3}$/.test(v)) initials = v.split(''); } catch { /* storage unavailable */ }
+  const saveInitials = () => { try { localStorage.setItem('aos-initials', initials.join('')); } catch { /* storage unavailable */ } };
+
+  // ---------- High scores (kept on the site's server) ----------
+  const api = (url, body, ms = 4000) => {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+    return fetch(url, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, signal: ctl.signal })
+      .then(async (r) => ({ ok: r.ok, status: r.status, json: await r.json().catch(() => null) }))
+      .catch(() => null).finally(() => clearTimeout(t));
+  };
+  const refreshBoard = () => api('/api/scores').then((r) => { if (r?.ok && Array.isArray(r.json?.scores) && !destroyed) board = r.json.scores; });
+  const award = (n, x, y) => { score += n; popups.push({ x, y, txt: '+' + n, life: 50 }); sfx.score(); };
+  function endRun() {
+    lock = 70; myRank = 0;
+    const r = run, mine = score; run = null;
+    if (!r) { refreshBoard(); return; }
+    api('/api/scores', { run: r, score: mine }).then((res) => {
+      if (destroyed) return;
+      if (res?.ok && res.json?.scores) { board = res.json.scores; myRank = res.json.rank || 0; } else refreshBoard();
+    });
+  }
+  function beginGame() { newGame(); state = 'play'; paused = false; if (bgm) bgm.currentTime = 0; bgmPlay(); }
+  // Ask the server for a run (it checks the initials), then start. If the server can't be reached, play anyway without a score.
+  function beginRun() {
+    busy = true; nameMsg = '';
+    api('/api/scores/run', { initials: initials.join('') }, 2500).then((r) => {
+      if (destroyed) return;
+      busy = false;
+      if (r && r.status === 400) { nameMsg = 'try another'; slot = 2; state = 'name'; return; }
+      run = r?.ok ? r.json?.run || null : null;
+      beginGame();
+    });
+  }
+  function openName() { slot = 0; nameMsg = ''; state = 'name'; refreshBoard(); }
+  function submitName() {
+    if (busy) return;
+    saveInitials();
+    if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.18; master.connect(ac.destination); }
+    ac.resume?.(); onStart?.(); beginRun();
+  }
+  const cycle = (d) => { initials[slot] = CH[(CH.indexOf(initials[slot]) + d + CH.length) % CH.length]; nameMsg = ''; sfx.tick(); };
+  const confirmSlot = () => { if (slot < 2) { slot++; sfx.tick(); } else submitName(); };
+  function nameKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const c = e.code;
+    if (c === 'ArrowLeft' || c === 'ArrowDown') { cycle(-1); return true; }
+    if (c === 'ArrowRight' || c === 'ArrowUp') { cycle(1); return true; }
+    const m = /^(?:Key([A-Z])|Digit([0-9]))$/.exec(c);
+    if (e.repeat && (m || c === 'Space' || c === 'Enter' || c === 'Backspace')) return true;
+    if (c === 'Space') { confirmSlot(); return true; }
+    if (c === 'Enter') { submitName(); return true; }
+    if (c === 'Backspace') { if (slot > 0) slot--; return true; }
+    if (m) { initials[slot] = m[1] || m[2]; nameMsg = ''; if (slot < 2) slot++; sfx.tick(); return true; }
+    return false;
+  }
+  function nameUpdate() {
+    if (busy) return;
+    for (const k of ['left', 'right']) {
+      if (pressed[k]) { cycle(k === 'left' ? -1 : 1); rep[k] = 0; }
+      else if (held[k]) { if (++rep[k] > 20 && rep[k] % 6 === 0) cycle(k === 'left' ? -1 : 1); }
+      else rep[k] = 0;
+    }
+    if (pressed.jump) confirmSlot();
+    if (pressed.start) submitName();
+  }
 
   const tileAt = (tx, ty) => (tx < 0 || tx >= L.LW) ? '#' : (ty < 0 || ty >= ROWS) ? '.' : L.g[ty][tx];
   const solid = (c) => c === '#' || c === '=';
@@ -162,7 +236,7 @@ export function mountGame(canvas, { onStart, music } = {}) {
   const groundY = (tx) => { for (let ty = 0; ty < ROWS; ty++) if (solid(tileAt(tx, ty))) return ty * T; return 12 * T; };
 
   function newGame() {
-    L = buildLevel(); lives = 3; depth = 0; cp = 0;
+    L = buildLevel(); lives = 3; depth = 0; cp = 0; score = 0; popups = [];
     enemies = []; orbs = [];
     for (const s of L.spawns) {
       const x = s.tx * T, bottom = (s.row + 1) * T;
@@ -171,15 +245,17 @@ export function mountGame(canvas, { onStart, music } = {}) {
       if (s.type === 'baron') enemies.push({ type: 'baron', x, y: bottom - 30, w: 22, h: 30, vx: 0, vy: 0, hp: 14, t: 60, jt: 140, active: false, flash: 0, face: -1 });
       if (s.type === 'orb') orbs.push({ x: x + 4, y: bottom - 12, w: 8, h: 8, taken: false });
     }
+    for (const e of enemies) { e.done = false; e.touched = false; e.engaged = false; e.dodges = 0; }
     spawnPlayer();
   }
   function spawnPlayer() {
     const tx = L.checkpoints[cp];
     p = { x: tx * T + 3, y: groundY(tx) - 14, w: 10, h: 14, vx: 0, vy: 0, face: 1, onGround: false, hp: 3, inv: 90, cool: 0, coyote: 0, buf: 0, run: 0 };
     shots = []; parts = [];
+    for (const e of enemies) if (e.x + e.w + 24 < p.x) e.done = true; // enemies behind a checkpoint never score
   }
   const burst = (x, y, n, colors) => { for (let i = 0; i < n; i++) parts.push({ x, y, vx: rnd(-1.6, 1.6), vy: rnd(-2.4, 0.4), life: rnd(18, 36), c: colors[i % colors.length] }); };
-  const fire = (x, y, vx, vy) => shots.push({ x: x - 3, y: y - 3, w: 6, h: 6, vx, vy, life: 200 });
+  const fire = (x, y, vx, vy, owner) => shots.push({ x: x - 3, y: y - 3, w: 6, h: 6, vx, vy, life: 200, owner, minD: 1e9 });
 
   function hurt() {
     if (p.inv > 0) return;
@@ -190,17 +266,19 @@ export function mountGame(canvas, { onStart, music } = {}) {
 
   function update() {
     tick++;
+    if (lock > 0) lock--;
     if (state !== 'play') {
-      if (state === 'dead' && --timer <= 0) { lives--; if (lives < 0) { state = 'over'; bgmStop(); } else { state = 'play'; spawnPlayer(); } }
-      if (pressed.start || pressed.jump) {
-        if (state === 'title' || state === 'over' || state === 'win') {
-          if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.18; master.connect(ac.destination); }
-          ac.resume?.(); onStart?.(); newGame(); state = 'play'; paused = false; if (bgm) bgm.currentTime = 0; bgmPlay();
-        }
+      const go = pressed.start || pressed.jump || pressed.tap;
+      if (state === 'dead') { if (--timer <= 0) { lives--; if (lives < 0) { state = 'over'; bgmStop(); endRun(); } else { state = 'play'; spawnPlayer(); } } }
+      else if (state === 'title') { if (go) { if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.18; master.connect(ac.destination); } ac.resume?.(); openName(); } }
+      else if (state === 'name') nameUpdate();
+      else if ((state === 'over' || state === 'win') && lock <= 0 && !busy) {
+        if (pressed.left) openName();
+        else if (go) { ac?.resume?.(); onStart?.(); beginRun(); }
       }
       clearPressed(); return;
     }
-    if (paused) { if (pressed.start || pressed.jump) setPaused(false); clearPressed(); return; }
+    if (paused) { if (pressed.start || pressed.jump || pressed.tap) setPaused(false); clearPressed(); return; }
 
     // Player
     const acc = 0.2, max = 1.9;
@@ -228,6 +306,10 @@ export function mountGame(canvas, { onStart, music } = {}) {
     for (const e of enemies) {
       if (e.flash > 0) e.flash--;
       const dx = p.x - e.x, dy = p.y - e.y;
+      if (!e.done) {
+        if (Math.abs(dx) < 140) e.engaged = true;
+        if (e.engaged && p.x > e.x + e.w + 24) { e.done = true; if (!e.touched) award(e.type === 'baron' ? 1000 : 100, e.x + e.w / 2, e.y - 4); }
+      }
       if (e.type === 'imp') {
         if (Math.abs(dx) > 260) continue;
         e.vy = Math.min(e.vy + 0.3, 6);
@@ -240,7 +322,7 @@ export function mountGame(canvas, { onStart, music } = {}) {
         e.face = Math.sign(e.vx) || e.face;
         if (Math.abs(dx) < 170 && Math.abs(dy) < 80 && --e.t <= 0) {
           e.t = rnd(100, 160); e.face = Math.sign(dx) || 1;
-          fire(e.x + e.w / 2, e.y + 5, e.face * 1.8, Math.max(-1, Math.min(1, dy / 90)));
+          fire(e.x + e.w / 2, e.y + 5, e.face * 1.8, Math.max(-1, Math.min(1, dy / 90)), e);
         }
       } else if (e.type === 'soul') {
         if (Math.abs(dx) > 260) continue;
@@ -248,12 +330,15 @@ export function mountGame(canvas, { onStart, music } = {}) {
         if (e.mode === 'float') {
           e.ph += 0.05; e.x += Math.sin(e.ph * 0.5) * 0.4; e.y = e.by + Math.sin(e.ph) * 8;
           if (e.t <= 0 && Math.hypot(dx, dy) < 120) {
-            const d = Math.hypot(dx, dy) || 1; e.mode = 'charge'; e.t = 45; e.vx = (dx / d) * 2.4; e.vy = (dy / d) * 2.4; sfx.charge();
+            const d = Math.hypot(dx, dy) || 1; e.mode = 'charge'; e.t = 45; e.vx = (dx / d) * 2.4; e.vy = (dy / d) * 2.4; e.cmin = 1e9; e.chit = false; sfx.charge();
           }
         } else {
-          e.x += e.vx; e.y += e.vy;
+          e.x += e.vx; e.y += e.vy; e.cmin = Math.min(e.cmin, Math.hypot(dx, dy));
           if (solid(tileAt(Math.floor((e.x + 6) / T), Math.floor((e.y + 5) / T)))) { e.x -= e.vx; e.y -= e.vy; e.t = 0; }
-          if (e.t <= 0) { e.mode = 'float'; e.by = e.y; e.ph = 0; e.t = 90; }
+          if (e.t <= 0) {
+            if (!e.chit && e.cmin < 30 && e.dodges < 3) { e.dodges++; award(100, p.x + 5, p.y - 6); } // the charge missed
+            e.mode = 'float'; e.by = e.y; e.ph = 0; e.t = 90;
+          }
         }
       } else if (e.type === 'baron') {
         if (!e.active) { if (p.x > 165 * T) { e.active = true; sfx.roar(); } else continue; }
@@ -263,23 +348,35 @@ export function mountGame(canvas, { onStart, music } = {}) {
         move(e, e.vx, e.vy);
         if (e.x < 158 * T) e.x = 158 * T;
         if (e.x > 192 * T - e.w) e.x = 192 * T - e.w;
-        if (--e.t <= 0) { e.t = 85; for (const s of [-0.7, 0, 0.7]) fire(e.x + e.w / 2, e.y + 10, e.face * 1.6, s); }
+        if (--e.t <= 0) { e.t = 85; for (const s of [-0.7, 0, 0.7]) fire(e.x + e.w / 2, e.y + 10, e.face * 1.6, s, e); }
         if (e.onGround && --e.jt <= 0) { e.vy = -4.8; e.jt = rnd(140, 200); }
       }
-      if (overlap(p, e)) hurt();
+      if (overlap(p, e)) { e.touched = true; if (e.mode === 'charge') e.chit = true; hurt(); }
     }
 
     // Shots
     for (const s of shots) {
       s.x += s.vx; s.y += s.vy; s.life--;
+      s.minD = Math.min(s.minD, Math.hypot(s.x + 3 - (p.x + 5), s.y + 3 - (p.y + 7)));
       if (solid(tileAt(Math.floor((s.x + s.w / 2) / T), Math.floor((s.y + s.h / 2) / T)))) { s.life = 0; burst(s.x, s.y, 3, [C.amber, C.k]); }
-      if (s.life > 0 && overlap(s, p)) { s.life = 0; hurt(); }
+      if (s.life > 0 && overlap(s, p)) { s.life = 0; s.hit = true; hurt(); }
+      else if (s.life > 0 && !s.counted && (s.vx > 0 ? s.x > p.x + p.w : s.x + s.w < p.x)) { // flew past the player
+        s.counted = true;
+        const o = s.owner;
+        if (o && s.minD < 26 && o.dodges < (o.type === 'baron' ? 8 : 3)) { o.dodges++; award(50, p.x + 5, p.y - 6); }
+      }
     }
     shots = shots.filter((s) => s.life > 0 && s.x > camX - 40 && s.x < camX + W + 40);
         for (const o of orbs) if (!o.taken && overlap(o, p)) { o.taken = true; p.hp = Math.min(3, p.hp + 1); sfx.pickup(); }
     for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += 0.12; q.life--; }
     parts = parts.filter((q) => q.life > 0);
-    if (L.gate.open && overlap(p, L.gate)) { state = 'win'; bgmStop(); sfx.gate(); }
+    for (const q of popups) { q.y -= 0.35; q.life--; }
+    popups = popups.filter((q) => q.life > 0);
+    if (L.gate.open && overlap(p, L.gate)) {
+      const b = enemies.find((e) => e.type === 'baron');
+      if (b && !b.done) { b.done = true; if (!b.touched) award(1000, p.x + 5, p.y - 6); }
+      state = 'win'; bgmStop(); sfx.gate(); endRun();
+    }
     depth = Math.max(depth, Math.floor(p.x / T));
     camX = Math.max(0, Math.min(p.x - 112, L.LW * T - W));
     clearPressed();
@@ -400,21 +497,62 @@ export function mountGame(canvas, { onStart, music } = {}) {
   function drawHud() {
     for (let i = 0; i < 3; i++) star(14 + i * 12, 14, 5, C.red, true, i >= p.hp);
     text('x' + Math.max(lives, 0), 50, 14, 10, C.bone, 'left');
+    text('score ' + score, W / 2, 14, 10, C.bone);
     text('depth ' + depth, W - 10, 14, 10, C.amber, 'right');
   }
+  // Two columns of five: rank, initials, score. The player's own fresh entry is highlighted.
+  function drawBoard(y0, mine) {
+    if (!board || !board.length) { text('no scores yet', W / 2, y0 + 24, 8, C.mid); return; }
+    for (let i = 0; i < 10; i++) {
+      const e = board[i]; if (!e) continue;
+      const x0 = i < 5 ? 30 : 136, y = y0 + (i % 5) * 12, hi = mine === i + 1;
+      const col = hi ? C.amber : C.bone;
+      text(String(i + 1), x0, y, 8, hi ? C.amber : C.mid, 'left'); text(e.i, x0 + 14, y, 8, col, 'left'); text(String(e.s), x0 + 92, y, 8, col, 'right');
+    }
+  }
   function draw() {
-    if (state === 'title') {
+    if (state === 'title' || state === 'name') {
       drawBackground(tick * 0.6); ctx.drawImage(frame, 0, 0);
+    }
+    if (state === 'title') {
       text('into the jaws', W / 2, 92, 26, C.red);
       text('age of stellara', W / 2, 116, 10, C.bone);
       if ((tick >> 5) % 2 === 0) text('press start', W / 2, 160, 12, C.amber);
+      if (board?.length) text('top  ' + board[0].i + '  ' + board[0].s, W / 2, 186, 8, C.bone);
       text('arrows move · z jump', W / 2, 212, 8, C.mid);
       return;
     }
-    drawWorld(); ctx.drawImage(frame, 0, 0); drawHud();
+    if (state === 'name') {
+      ctx.fillStyle = 'rgba(5,3,4,.8)'; ctx.fillRect(0, 104, W, 132);
+      text('enter your mark', W / 2, 34, 16, C.red);
+      for (let i = 0; i < 3; i++) {
+        const x = W / 2 + (i - 1) * 36, on = i === slot;
+        text(initials[i], x, 76, 30, on ? C.amber : C.bone);
+        if (on && !busy && (tick >> 4) % 2 === 0) { ctx.fillStyle = C.amber; ctx.fillRect(x - 9, 94, 18, 2); }
+      }
+      text('left / right: letter  ·  jump: set', W / 2, 116, 8, C.bone);
+      if (busy) text('...', W / 2, 134, 9, C.bone);
+      else if (nameMsg) text(nameMsg, W / 2, 134, 9, C.red);
+      else if (slot === 2 && (tick >> 5) % 2 === 0) text('jump to begin', W / 2, 134, 9, C.amber);
+      text('high scores', W / 2, 156, 8, C.mid);
+      drawBoard(172, 0);
+      return;
+    }
+    drawWorld(); ctx.drawImage(frame, 0, 0);
+    for (const q of popups) text(q.txt, q.x - camX, q.y, 8, C.amber);
+    drawHud();
     if (paused) { ctx.fillStyle = 'rgba(5,3,4,.6)'; ctx.fillRect(0, 0, W, H); text('paused', W / 2, 110, 18, C.amber); text('click to resume', W / 2, 132, 9, C.bone); }
-    if (state === 'over') { ctx.fillStyle = 'rgba(5,3,4,.75)'; ctx.fillRect(0, 0, W, H); text('swallowed', W / 2, 104, 24, C.red); text('press start', W / 2, 140, 11, C.amber); }
-    if (state === 'win') { ctx.fillStyle = 'rgba(5,3,4,.7)'; ctx.fillRect(0, 0, W, H); text('deeper still', W / 2, 100, 24, C.amber); text('depth ' + depth, W / 2, 128, 11, C.bone); text('press start', W / 2, 154, 10, C.red); }
+    if (state === 'over' || state === 'win') {
+      ctx.fillStyle = state === 'over' ? 'rgba(5,3,4,.78)' : 'rgba(5,3,4,.74)'; ctx.fillRect(0, 0, W, H);
+      text(state === 'over' ? 'swallowed' : 'deeper still', W / 2, 46, 24, state === 'over' ? C.red : C.amber);
+      text('score ' + score, W / 2, 74, 12, C.bone);
+      if (myRank > 0 && myRank <= 10) text('rank ' + myRank, W / 2, 90, 9, C.amber);
+      text('high scores', W / 2, 114, 8, C.mid);
+      drawBoard(130, myRank);
+      if (busy) text('...', W / 2, 204, 10, C.bone);
+      else if (lock <= 0 && (tick >> 5) % 2 === 0) text('press start', W / 2, 204, 11, C.amber);
+      text('left: change name', W / 2, 222, 7, C.mid);
+    }
   }
   function makeFrame() {
     const f = document.createElement('canvas'); f.width = W; f.height = H;
@@ -448,18 +586,18 @@ export function mountGame(canvas, { onStart, music } = {}) {
   const stopLoop = () => { cancelAnimationFrame(raf); raf = 0; };
   const io = new IntersectionObserver(([en]) => { visible = en.isIntersecting; if (visible) startLoop(); else { stopLoop(); if (state === 'play' && !paused) setPaused(true); } });
   io.observe(canvas);
-  newGame(); state = 'title'; camX = 0; draw(); startLoop();
+  newGame(); state = 'title'; camX = 0; refreshBoard(); draw(); startLoop();
 
   return {
     press,
     setMusicVolume(v) { bgmVol = v; if (bgm) bgm.volume = v; },
     destroy() {
-      stopLoop(); io.disconnect(); bgmStop(); bgm = null; window.removeEventListener('aos:player-play', onPlayerPlay);
+      destroyed = true; stopLoop(); io.disconnect(); bgmStop(); bgm = null; window.removeEventListener('aos:player-play', onPlayerPlay);
       canvas.removeEventListener('keydown', onKey); canvas.removeEventListener('keyup', onKey);
       canvas.removeEventListener('blur', onBlur); canvas.removeEventListener('pointerdown', onClick);
       ac?.close?.();
     },
     // For automated checks only.
-    _debug: () => ({ state, paused, music: bgm ? { playing: !bgm.paused, t: +bgm.currentTime.toFixed(2) } : null, lives, depth, hp: p.hp, x: p.x, y: p.y, cp, enemies: enemies.length, gateOpen: L.gate.open }),
+    _debug: () => ({ state, paused, music: bgm ? { playing: !bgm.paused, t: +bgm.currentTime.toFixed(2) } : null, lives, depth, score, myRank, board: board?.length ?? null, initials: initials.join(''), run: !!run, hp: p.hp, x: p.x, y: p.y, cp, enemies: enemies.length, gateOpen: L.gate.open }),
   };
 }

@@ -13,7 +13,7 @@ function Game({musicSrc,volume}){const ref=useRef(null),api=useRef(null);
 useEffect(()=>{api.current=mountGame(ref.current,{onStart:()=>window.dispatchEvent(new Event('aos:game-start')),music:musicSrc?{src:musicSrc,loopEnd:GAME_MUSIC.loopEnd}:null});return()=>api.current.destroy()},[]);
 useEffect(()=>{api.current?.setMusicVolume(volume*GAME_MUSIC_LEVEL)},[volume]);
 const hold=k=>({onPointerDown:e=>{e.preventDefault();api.current?.press(k,true)},onPointerUp:()=>api.current?.press(k,false),onPointerLeave:()=>api.current?.press(k,false),onPointerCancel:()=>api.current?.press(k,false)});
-return <section className="section game-section" id="play"><div className="section-head"><div><p className="section-kicker"><Star slot="play"/> PLAY</p><h2>INTO THE JAWS</h2></div><p className="section-desc">Click the screen to start. Arrow keys to move, Z to jump.</p></div>
+return <section className="section game-section" id="play"><div className="section-head"><div><p className="section-kicker"><Star slot="play"/> PLAY</p><h2>INTO THE JAWS</h2></div><p className="section-desc">Click the screen to start. Arrow keys to move, Z to jump. Slip past the demons and dodge their fire to earn a place on the high score list.</p></div>
 <div className="game-frame"><canvas ref={ref} width="256" height="240" tabIndex="0" aria-label="Into the Jaws, a platformer game. Click to start."/></div>
 <div className="game-touch" aria-hidden="true"><div><button {...hold('left')}>◀</button><button {...hold('right')}>▶</button></div><div><button {...hold('jump')}>JUMP</button></div></div></section>}
 function App(){
