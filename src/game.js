@@ -179,7 +179,7 @@ export function mountGame(canvas, { onStart, music } = {}) {
 
   // World state
   let L, levelIdx = 0, p, enemies, shots, parts, orbs, camX, state = 'title', paused = false, lives, depth, timer = 0, cp, tick = 0;
-  let score = 0, popups = [], board = null, run = null, slot = 0, busy = false, nameMsg = '', lock = 0, myRank = 0, destroyed = false;
+  let testRun = false, score = 0, popups = [], board = null, run = null, slot = 0, busy = false, nameMsg = '', lock = 0, myRank = 0, destroyed = false;
   const CH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', rep = { left: 0, right: 0 };
   let initials = ['A', 'A', 'A'];
   try { const v = (localStorage.getItem('aos-initials') || '').toUpperCase(); if (/^[A-Z0-9]{3}$/.test(v)) initials = v.split(''); } catch { /* storage unavailable */ }
@@ -203,9 +203,11 @@ export function mountGame(canvas, { onStart, music } = {}) {
       if (res?.ok && res.json?.scores) { board = res.json.scores; myRank = res.json.rank || 0; } else refreshBoard();
     });
   }
-  function beginGame() { newGame(); state = 'play'; paused = false; bgmPlay(true); }
+  function beginGame() { newGame(); if (testRun) { depth = 200; loadLevel(1); } state = 'play'; paused = false; bgmPlay(true); }
   // Ask the server for a run (it checks the initials), then start. If the server can't be reached, play anyway without a score.
   function beginRun() {
+    testRun = initials.join('') === 'LV2'; // secret: these initials start on level 2 and the run is never scored
+    if (testRun) { run = null; beginGame(); return; }
     busy = true; nameMsg = '';
     api('/api/scores/run', { initials: initials.join('') }, 2500).then((r) => {
       if (destroyed) return;
@@ -599,6 +601,7 @@ export function mountGame(canvas, { onStart, music } = {}) {
     text('x' + Math.max(lives, 0), 50, 14, 10, C.bone, 'left');
     text('score ' + score, W / 2, 14, 10, C.bone);
     text('depth ' + depth, W - 10, 14, 10, C.amber, 'right');
+    if (testRun) text('test run', W / 2, 28, 7, C.mid);
   }
   // Two columns of five: rank, initials, score. The player's own fresh entry is highlighted.
   function drawBoard(y0, mine) {
@@ -650,7 +653,8 @@ export function mountGame(canvas, { onStart, music } = {}) {
       ctx.fillStyle = state === 'over' ? 'rgba(5,3,4,.78)' : 'rgba(5,3,4,.74)'; ctx.fillRect(0, 0, W, H);
       text(state === 'over' ? 'swallowed' : 'deeper still', W / 2, 46, 24, state === 'over' ? C.red : C.amber);
       text('score ' + score, W / 2, 74, 12, C.bone);
-      if (myRank > 0 && myRank <= 10) text('rank ' + myRank, W / 2, 90, 9, C.amber);
+      if (testRun) text('test run - not scored', W / 2, 90, 8, C.mid);
+      else if (myRank > 0 && myRank <= 10) text('rank ' + myRank, W / 2, 90, 9, C.amber);
       text('high scores', W / 2, 114, 8, C.mid);
       drawBoard(130, myRank);
       if (busy) text('...', W / 2, 204, 10, C.bone);
