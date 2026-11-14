@@ -8,6 +8,10 @@ export const band = {
   links: [
     { label: 'YOUTUBE', url: 'https://www.youtube.com/channel/UCCOxqDbQgHd0Q3YTwJ-BMyg' },
     { label: 'FACEBOOK', url: 'https://www.facebook.com/profile.php?id=61596274840497' },
+    { label: 'SPOTIFY', url: 'https://open.spotify.com/artist/6RyffQHvQdHt3r5h7o3ecK' },
+    { label: 'APPLE MUSIC', url: 'https://music.apple.com/us/artist/age-of-stellara/1850212218' },
+    { label: 'YOUTUBE MUSIC', url: 'https://music.youtube.com/@ageofstellara' },
+    { label: 'AMAZON MUSIC', url: 'https://amazon.com/music/player/artists/B0FZ2WQYCJ/age-of-stellara?marketplaceId=ATVPDKIKX0DER&musicTerritory=US' },
   ]
 };
 // Shown in the hero and music section until tracks are added to `releases`.
