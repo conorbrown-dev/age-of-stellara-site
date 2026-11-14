@@ -40,8 +40,9 @@ const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
 let scores = [];
 try { scores = JSON.parse(fs.readFileSync(SCORES_FILE, 'utf8')); } catch { /* first run */ }
 const saveScores = makeSaver(SCORES_FILE, () => scores);
-// Most a run can earn: 6 imps x (100 pass + 3x50 dodge) + 4 skulls x (100 pass + 3x100 dodge) + boss (1000 pass + 8x50 dodge).
-const MAX_SCORE = 4500;
+// Most a run can earn. Level 1: 6 imps x (100 + 3x50) + 4 skulls x (100 + 3x100) + baron (1000 + 8x50) = 4500.
+// Level 2: 8 imps x 250 + 5 skulls x 400 + warden (1500 + 8x50 + 4x150) = 6500. Rounded up a little.
+const MAX_SCORE = 11500;
 const runs = new Map(); // run id -> { t: start time, i: initials }; a run can be submitted once
 const runGap = new Map(); // ip -> last run start
 const BLOCKED = new Set(['ASS', 'CUM', 'DIK', 'FAG', 'FAP', 'FCK', 'FUC', 'FUK', 'HOE', 'KKK', 'NAZ', 'NGR', 'NIG', 'SEX', 'SHT', 'TIT', 'WTF', 'XXX', 'JIZ', 'PUS', 'CUK', 'FAK', 'FUX']);
